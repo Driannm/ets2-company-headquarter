@@ -1,0 +1,22 @@
+{
+  "name": "@ets2-company-headquarter/database",
+  "version": "1.0.0",
+  "private": true,
+  "main": "./dist/index.js",
+  "types": "./dist/index.d.ts",
+  "scripts": {
+    "build": "tsc",
+    "db:generate": "drizzle-kit generate:sqlite",
+    "db:migrate": "tsx src/migrate.ts"
+  },
+  "dependencies": {
+    "better-sqlite3": "^9.4.3",
+    "drizzle-orm": "^0.30.9"
+  },
+  "devDependencies": {
+    "@types/better-sqlite3": "^7.6.9",
+    "drizzle-kit": "^0.20.17",
+    "tsx": "^4.7.2",
+    "typescript": "^5.4.5"
+  }
+}
