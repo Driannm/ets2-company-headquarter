@@ -1,12 +1,17 @@
-import { drizzle } from 'drizzle-orm/better-sqlite3';
+import { drizzle, BetterSQLite3Database } from 'drizzle-orm/better-sqlite3';
 import Database from 'better-sqlite3';
 import * as schema from './schema.js';
 
 export * from './schema.js';
 
-export function createDatabaseClient(databasePath: string) {
+// Definisikan interface return type secara eksplisit untuk mencegah TS4058
+export interface DatabaseClient {
+  db: BetterSQLite3Database<typeof schema>;
+  sqlite: Database.Database;
+}
+
+export function createDatabaseClient(databasePath: string): DatabaseClient {
   const sqlite = new Database(databasePath);
-  // Aktifkan Write-Ahead Logging untuk performa write-heavy concurrency
   sqlite.pragma('journal_mode = WAL');
   sqlite.pragma('synchronous = NORMAL');
   
