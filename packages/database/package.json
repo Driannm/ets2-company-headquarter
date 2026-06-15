@@ -7,15 +7,20 @@
   "scripts": {
     "build": "tsc",
     "db:generate": "drizzle-kit generate:sqlite",
-    "db:migrate": "tsx src/migrate.ts"
+    "db:migrate": "tsx src/migrate.ts",
+    "pg:generate": "drizzle-kit generate:pg --config=drizzle.pg.config.cjs",
+    "pg:push": "drizzle-kit push:pg --config=drizzle.pg.config.cjs",
+    "pg:migrate": "tsx src/migrate-pg.ts"
   },
   "dependencies": {
-    "@types/better-sqlite3": "^7.6.9",
     "better-sqlite3": "^9.4.3",
-    "drizzle-orm": "^0.30.9"
+    "drizzle-orm": "^0.30.9",
+    "postgres": "^3.4.4"
   },
   "devDependencies": {
+    "@types/better-sqlite3": "^7.6.9",
     "drizzle-kit": "^0.20.17",
+    "dotenv": "^16.4.5",
     "tsx": "^4.7.2",
     "typescript": "^5.4.5"
   }
