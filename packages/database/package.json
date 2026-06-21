@@ -6,21 +6,22 @@
   "types": "./dist/index.d.ts",
   "scripts": {
     "build": "tsc",
-    "db:generate": "drizzle-kit generate:sqlite",
+    "db:all": "pnpm --filter @ets2-company-headquarter/database run db:generate && pnpm --filter @ets2-company-headquarter/database run db:migrate && pnpm --filter @ets2-company-headquarter/database run pg:generate && pnpm --filter @ets2-company-headquarter/database run pg:migrate",
+    "db:generate": "drizzle-kit generate --config=drizzle.config.ts",
     "db:migrate": "tsx src/migrate.ts",
-    "pg:generate": "drizzle-kit generate:pg --config=drizzle.pg.config.cjs",
-    "pg:push": "drizzle-kit push:pg --config=drizzle.pg.config.cjs",
-    "pg:migrate": "tsx src/migrate-pg.ts"
+    "pg:generate": "drizzle-kit generate --config=drizzle.pg.config.ts",
+    "pg:migrate": "tsx src/migrate.pg.ts",
+    "db:studio": "drizzle-kit studio"
   },
   "dependencies": {
     "better-sqlite3": "^9.4.3",
-    "drizzle-orm": "^0.30.9",
+    "drizzle-orm": "^0.45.2",
     "postgres": "^3.4.4"
   },
   "devDependencies": {
     "@types/better-sqlite3": "^7.6.9",
-    "drizzle-kit": "^0.20.17",
     "dotenv": "^16.4.5",
+    "drizzle-kit": "^0.31.10",
     "tsx": "^4.7.2",
     "typescript": "^5.4.5"
   }
