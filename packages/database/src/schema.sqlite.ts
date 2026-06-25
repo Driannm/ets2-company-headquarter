@@ -1,120 +1,203 @@
 import { sqliteTable, text, integer, real } from "drizzle-orm/sqlite-core";
 import { relations } from "drizzle-orm";
 
-// --- KATALOG KOMPONEN JALUR UTAMA (1:N) ---
+// ============================================================
+// KOMPONEN KATALOG
+// Diisi dari data_path accessory — bukan dari savegame langsung.
+// horsepower/torque/gearsCount nullable karena tidak ada di savegame.
+// ============================================================
 
 export const cabins = sqliteTable("cabins", {
-  id: text("id").primaryKey(), // e.g. "scania_highline"
-  name: text("name").notNull(), // e.g. "Highline Sleeper"
-  brand: text("brand").notNull(), // e.g. "Scania"
+  id: text("id").primaryKey(),
+  gameRefId: text("game_ref_id").unique(),  // ref id nameless dari savegame
+  name: text("name").notNull(),
+  brand: text("brand").notNull(),
+  dataPath: text("data_path"),              // /def/vehicle/truck/.../cabin/...
   updatedAt: integer("updated_at", { mode: "timestamp" }).notNull(),
 });
 
 export const chassis = sqliteTable("chassis", {
-  id: text("id").primaryKey(), // e.g. "scania_6x2"
-  name: text("name").notNull(), // e.g. "6x2 Taglift"
-  fuelTank: text("fuel_tank"),
+  id: text("id").primaryKey(),
+  gameRefId: text("game_ref_id").unique(),
+  name: text("name").notNull(),
   brand: text("brand").notNull(),
+  dataPath: text("data_path"),
+  // Tidak tersedia di savegame — diisi manual atau dari def files game
+  fuelCapacityLiters: integer("fuel_capacity_liters"),
   updatedAt: integer("updated_at", { mode: "timestamp" }).notNull(),
 });
 
 export const engines = sqliteTable("engines", {
-  id: text("id").primaryKey(), // e.g. "scania_v8_730"
-  name: text("name").notNull(), // e.g. "DC16 117 730 Euro 6"
-  horsepower: integer("horsepower").notNull(), // e.g. 730
-  torque: integer("torque").notNull(), // e.g. 3500 (Nm)
+  id: text("id").primaryKey(),
+  gameRefId: text("game_ref_id").unique(),
+  name: text("name").notNull(),
   brand: text("brand").notNull(),
+  dataPath: text("data_path"),
+  // Nullable — tidak ada di savegame
+  horsepower: integer("horsepower"),
+  torque: integer("torque"),
   updatedAt: integer("updated_at", { mode: "timestamp" }).notNull(),
 });
 
 export const transmissions = sqliteTable("transmissions", {
-  id: text("id").primaryKey(), // e.g. "opticruise_12_r"
-  name: text("name").notNull(), // e.g. "Opticruise GRSO 925R"
-  gearsCount: integer("gears_count").default(12), // e.g. 12
-  hasRetarder: integer("has_retarder", { mode: "boolean" }).default(true),
+  id: text("id").primaryKey(),
+  gameRefId: text("game_ref_id").unique(),
+  name: text("name").notNull(),
   brand: text("brand").notNull(),
+  dataPath: text("data_path"),
+  gearsCount: integer("gears_count"),
+  hasRetarder: integer("has_retarder", { mode: "boolean" }).default(false),
   updatedAt: integer("updated_at", { mode: "timestamp" }).notNull(),
 });
 
-// --- TABEL UTAMA ---
+// ============================================================
+// GARAGES
+// ============================================================
 
 export const garages = sqliteTable("garages", {
   id: text("id").primaryKey(),
+  // gameRefId = "garage.koln" dari savegame
   gameRefId: text("game_ref_id").unique(),
   city: text("city").notNull(),
-  country: text("country").notNull(),
-  locationToken: text("location_token"),
+  country: text("country").notNull().default("Europe"),
   upgradeLevel: integer("upgrade_level").default(1),
-  maxCapacity: integer("max_capacity").default(3),
-  vehicleSlots: integer("vehicle_slots").default(3),
-  driverSlots: integer("driver_slots").default(3),
+  maxCapacity: integer("max_capacity").default(1),
   syncStatus: text("sync_status").default("pending"),
-  updatedAt: integer("updated_at", {
-    mode: "timestamp",
-  }).notNull(),
+  updatedAt: integer("updated_at", { mode: "timestamp" }).notNull(),
 });
+
+// ============================================================
+// TRUCKS
+// ============================================================
 
 export const trucks = sqliteTable("trucks", {
   id: text("id").primaryKey(),
+  // gameRefId = "_nameless.213.1988.2d30" dari savegame
   gameRefId: text("game_ref_id").unique(),
   brand: text("brand").notNull(),
   model: text("model").notNull(),
   name: text("name"),
   licensePlate: text("license_plate").notNull().unique(),
+
   garageId: text("garage_id").references(() => garages.id, {
     onDelete: "set null",
   }),
-  cabinId: text("cabin_id").references(() => cabins.id),
-  chassisId: text("chassis_id").references(() => chassis.id),
-  engineId: text("engine_id").references(() => engines.id),
-  transmissionId: text("transmission_id").references(() => transmissions.id),
-  trailerId: text("trailer_id"),
+
+  // Component ref ids ke accessory blocks dari savegame
+  cabinId: text("cabin_id").references(() => cabins.id, {
+    onDelete: "set null",
+  }),
+  chassisId: text("chassis_id").references(() => chassis.id, {
+    onDelete: "set null",
+  }),
+  engineId: text("engine_id").references(() => engines.id, {
+    onDelete: "set null",
+  }),
+  transmissionId: text("transmission_id").references(() => transmissions.id, {
+    onDelete: "set null",
+  }),
+
+  // Kondisi: 1.0 = sempurna, 0.0 = rusak total
   conditionCabin: real("condition_cabin").default(1),
   conditionChassis: real("condition_chassis").default(1),
   conditionEngine: real("condition_engine").default(1),
   conditionTransmission: real("condition_transmission").default(1),
-  wearWheels: real("wear_wheels").default(1),
-  wearPaint: real("wear_paint").default(1),
+  wearWheels: real("wear_wheels").default(1),        // rata-rata semua roda
+
+  // fuel_relative dari savegame = rasio 0.0-1.0, bukan liter
+  // fuelCapacityLiters diambil dari chassis def (tidak ada di savegame)
+  // fuelLiters = fuelRatio * fuelCapacityLiters (dihitung setelah sync chassis)
+  fuelRatio: real("fuel_ratio").default(0),
+  fuelCapacityLiters: real("fuel_capacity_liters").default(0),
   fuelLiters: real("fuel_liters").default(0),
-  fuelCapacity: real("fuel_capacity").default(0),
-  purchasePrice: integer("purchase_price"),
-  isPlayerTruck: integer("is_player_truck", { mode: "boolean" }).default(false),
+
   odometerKm: real("odometer_km").default(0),
-  lastSeenAt: integer("last_seen_at", { mode: "timestamp" }),
+  isPlayerTruck: integer("is_player_truck", { mode: "boolean" }).default(false),
+
   syncStatus: text("sync_status").default("pending"),
-  updatedAt: integer("updated_at", {
-    mode: "timestamp",
-  }).notNull(),
+  updatedAt: integer("updated_at", { mode: "timestamp" }).notNull(),
 });
+
+// ============================================================
+// DRIVERS
+// ============================================================
 
 export const drivers = sqliteTable("drivers", {
   id: text("id").primaryKey(),
+  // gameRefId = "driver.308" dari savegame
   gameRefId: text("game_ref_id").unique(),
+
+  // Nama di-generate oleh parser: "Driver #308 (Glasgow)" atau "Player"
+  // ETS2 tidak menyimpan nama asli driver di savegame
   name: text("name").notNull(),
+
   garageId: text("garage_id").references(() => garages.id, {
     onDelete: "set null",
   }),
-  truckId: text("truck_id").references(() => trucks.id, {
+
+  // Status dari state field + cek job_info.cargo
+  status: text("status").default("idle"),
+  // "idle" | "resting" | "driving" | "on_delivery"
+
+  // Data kota dari savegame
+  hometown: text("hometown"),
+  currentCity: text("current_city"),
+
+  // XP dari savegame — bisa dipakai hitung level
+  experiencePoints: integer("experience_points").default(0),
+
+  // Skills dari driver_ai block (0 untuk player)
+  adrSkill: integer("adr_skill").default(0),
+  longDistanceSkill: integer("long_distance_skill").default(0),
+  heavySkill: integer("heavy_skill").default(0),
+  fragileSkill: integer("fragile_skill").default(0),
+  urgentSkill: integer("urgent_skill").default(0),
+  mechanicalSkill: integer("mechanical_skill").default(0),
+  // eco tidak ada di savegame ETS2
+
+  isPlayer: integer("is_player", { mode: "boolean" }).default(false),
+
+  // rating & salaryPerKm tidak ada di savegame — nullable, bisa diisi manual
+  rating: real("rating"),
+  salaryPerKm: real("salary_per_km"),
+
+  syncStatus: text("sync_status").default("pending"),
+  updatedAt: integer("updated_at", { mode: "timestamp" }).notNull(),
+});
+
+// ============================================================
+// TRAILERS
+// ============================================================
+
+export const trailers = sqliteTable("trailers", {
+  id: text("id").primaryKey(),
+  gameRefId: text("game_ref_id").unique(),
+
+  brand: text("brand"),
+  model: text("model"),
+
+  // e.g., "trailer_def.scs.box.single_3.dryvan"
+  trailerDefinition: text("trailer_definition"),
+  // e.g., "cont_40" atau "dryvan"
+  bodyType: text("body_type"),
+
+  garageId: text("garage_id").references(() => garages.id, {
     onDelete: "set null",
   }),
-  rating: real("rating").default(1),
-  salaryPerKm: real("salary_per_km").default(3.5),
-  salary: real("salary"),
-  profitAbility: integer("profit_ability").default(0),
-  longDistanceSkill: integer("long_distance_skill").default(0),
-  status: text("status").default("idle"),
-  trainingSkill: text("training_skill"),
-  distanceSkill: integer("distance_skill").default(0),
-  ecoSkill: integer("eco_skill").default(0),
-  fragileSkill: integer("fragile_skill").default(0),
-  adrSkill: integer("adr_skill").default(0),
-  isOnJob: integer("is_on_job", { mode: "boolean" }).default(false),
-  lastRevenue: integer("last_revenue").default(0),
+
+  assignedDriverId: text("assigned_driver_id"),
+  assignedTruckId: text("assigned_truck_id"),
+
+  // Kondisi: 1.0 = sempurna, 0.0 = rusak
+  condition: real("condition").default(1),
+
   syncStatus: text("sync_status").default("pending"),
-  updatedAt: integer("updated_at", {
-    mode: "timestamp",
-  }).notNull(),
+  updatedAt: integer("updated_at", { mode: "timestamp" }).notNull(),
 });
+
+// ============================================================
+// JOBS
+// ============================================================
 
 export const jobs = sqliteTable("jobs", {
   id: text("id").primaryKey(),
@@ -137,85 +220,79 @@ export const jobs = sqliteTable("jobs", {
   }),
   completedAt: integer("completed_at", { mode: "timestamp" }),
   syncStatus: text("sync_status").default("pending"),
-  updatedAt: integer("updated_at", {
-    mode: "timestamp",
-  }).notNull(),
+  updatedAt: integer("updated_at", { mode: "timestamp" }).notNull(),
 });
 
-export const trailers = sqliteTable("trailers", {
-  id: text("id").primaryKey(),
-  gameRefId: text("game_ref_id").unique(),
-  brand: text("brand"),
-  model: text("model"),
-  cargo: text("cargo"),
-  licensePlate: text("license_plate"),
-  trailerDefinition: text("trailer_definition"),
-  bodyType: text("body_type"),
-  assignedDriverId: text("assigned_driver_id"),
-  assignedTruckId: text("assigned_truck_id"),
-  garageId: text("garage_id").references(() => garages.id, {
-    onDelete: "set null",
-  }),
-  condition: real("condition").default(1),
-  odometerKm: real("odometer_km").default(0),
-  updatedAt: integer("updated_at", {
-    mode: "timestamp",
-  }).notNull(),
-  syncStatus: text("sync_status").default("pending"),
-});
+// ============================================================
+// COMPANY STATS
+// ============================================================
 
 export const companyStats = sqliteTable("company_stats", {
   id: text("id").primaryKey(),
   money: integer("money").default(0),
   loanAmount: integer("loan_amount").default(0),
-  totalDistanceKm: real("total_distance_km").default(0),
-  companyValue: integer("company_value").default(0),
-  totalDrivers: integer("total_drivers").default(0),
   totalGarages: integer("total_garages").default(0),
+  totalDrivers: integer("total_drivers").default(0),
   totalTrucks: integer("total_trucks").default(0),
   totalTrailers: integer("total_trailers").default(0),
-  recordedAt: integer("recorded_at", {
-    mode: "timestamp",
-  }).notNull(),
+  recordedAt: integer("recorded_at", { mode: "timestamp" }).notNull(),
   syncStatus: text("sync_status").default("pending"),
 });
 
-// --- RELATION DEFINITIONS ---
+// ============================================================
+// RELATIONS
+// ============================================================
+
+export const garageRelations = relations(garages, ({ many }) => ({
+  trucks: many(trucks),
+  drivers: many(drivers),
+  trailers: many(trailers),
+}));
+
+export const truckRelations = relations(trucks, ({ one }) => ({
+  garage: one(garages, {
+    fields: [trucks.garageId],
+    references: [garages.id],
+  }),
+  cabin: one(cabins, {
+    fields: [trucks.cabinId],
+    references: [cabins.id],
+  }),
+  chassis: one(chassis, {
+    fields: [trucks.chassisId],
+    references: [chassis.id],
+  }),
+  engine: one(engines, {
+    fields: [trucks.engineId],
+    references: [engines.id],
+  }),
+  transmission: one(transmissions, {
+    fields: [trucks.transmissionId],
+    references: [transmissions.id],
+  }),
+}));
+
 export const driverRelations = relations(drivers, ({ one }) => ({
   garage: one(garages, {
     fields: [drivers.garageId],
     references: [garages.id],
   }),
+}));
 
-  truck: one(trucks, {
-    fields: [drivers.truckId],
-    references: [trucks.id],
+export const trailerRelations = relations(trailers, ({ one }) => ({
+  garage: one(garages, {
+    fields: [trailers.garageId],
+    references: [garages.id],
   }),
 }));
 
-export const truckRelations = relations(trucks, ({ one }) => ({
-  cabin: one(cabins, {
-    fields: [trucks.cabinId],
-    references: [cabins.id],
+export const jobRelations = relations(jobs, ({ one }) => ({
+  driver: one(drivers, {
+    fields: [jobs.driverId],
+    references: [drivers.id],
   }),
-
-  chassis: one(chassis, {
-    fields: [trucks.chassisId],
-    references: [chassis.id],
-  }),
-
-  engine: one(engines, {
-    fields: [trucks.engineId],
-    references: [engines.id],
-  }),
-
-  transmission: one(transmissions, {
-    fields: [trucks.transmissionId],
-    references: [transmissions.id],
-  }),
-
-  garage: one(garages, {
-    fields: [trucks.garageId],
-    references: [garages.id],
+  truck: one(trucks, {
+    fields: [jobs.truckId],
+    references: [trucks.id],
   }),
 }));

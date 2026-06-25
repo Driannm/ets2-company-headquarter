@@ -13,8 +13,8 @@ const sqlite = new Database(dbPath);
 const db = drizzle(sqlite);
 
 try {
-  migrate(db, { 
-    migrationsFolder: path.join(__dirname, 'migrations') 
+  migrate(db, {
+    migrationsFolder: path.join(__dirname, 'migrations', 'sqlite')
   });
   console.log('Migrasi database berhasil diselesaikan.');
   process.exit(0);
