@@ -1,4 +1,4 @@
-import { TelemetryPayload } from '@ets2-dashboard/types';
+import { TelemetryPayload } from '@ets2-company-headquarter/types';
 
 export interface TelemetryProvider {
   /**
